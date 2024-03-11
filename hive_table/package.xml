@@ -13,7 +13,6 @@
   <test_depend>ament_lint_common</test_depend>
 
   <!--추가로 만든 ROS package들 이어서 기재-->
-  <exec_depend>table_description</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
