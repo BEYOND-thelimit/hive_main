@@ -42,6 +42,11 @@ ament_target_dependencies(print_grid_odom_node
 install(TARGETS grid_map_odom_node pose_estimator_node print_grid_odom_node
   DESTINATION lib/${PROJECT_NAME}
 )
+# launch
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
