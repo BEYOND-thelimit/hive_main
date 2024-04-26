@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -26,6 +27,7 @@ add_executable(grid_map_odom_node src/odom_in_grid_map.cpp)
 ament_target_dependencies(grid_map_odom_node
   rclcpp
   nav_msgs
+  geometry_msgs
 )
 
 # node
