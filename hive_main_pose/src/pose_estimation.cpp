@@ -1,8 +1,11 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "tf2/utils.h"
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include "tf2/exceptions.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_eigen/tf2_eigen.hpp"
+#include "eigen3/Eigen/Dense"
 
 auto createQuaternionMsgFromYaw(double yaw)
 {
@@ -50,6 +53,10 @@ class PoseEstimationNode : public rclcpp::Node
   Pose pose_from_ekf_;
   Pose pose_from_camera_;
   Pose final_pose_;
+
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::string target_frame_;
 };
 
 PoseEstimationNode::PoseEstimationNode(/* args */) : Node("final_pose_estimation_node")
@@ -61,6 +68,13 @@ PoseEstimationNode::PoseEstimationNode(/* args */) : Node("final_pose_estimation
       "robot1/camera_odom", 10, std::bind(&PoseEstimationNode::cameraOdomCallback, this, std::placeholders::_1));
   final_pose_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("robot1/final_pose", 10);
   timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&PoseEstimationNode::timerCallback, this));
+    // Declare and acquire `target_frame` parameter
+    target_frame_ = this->declare_parameter<std::string>("target_frame", "camera1_link");
+
+    tf_buffer_ =
+      std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ =
+      std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 PoseEstimationNode::~PoseEstimationNode()
@@ -76,7 +90,38 @@ void PoseEstimationNode::ekfOdomCallback(const nav_msgs::msg::Odometry::SharedPt
 
 void PoseEstimationNode::cameraOdomCallback(const nav_msgs::msg::Odometry::SharedPtr camera_msg)
 {
-  // TODO: camera coords 좌표 받아서 Transform 찾고, world에서 본 좌표 계산
+  // Transform world -> camera1_link
+  std::string fromFrameRel = target_frame_.c_str();
+  std::string toFrameRel = "world";
+
+  geometry_msgs::msg::TransformStamped t;
+  Eigen::Isometry3d transform_matrix;
+
+  Eigen::Vector3d camera_pose;
+  camera_pose.x() = camera_msg->pose.pose.position.x;
+  camera_pose.y() = camera_msg->pose.pose.position.y;
+  camera_pose.z() = camera_msg->pose.pose.position.z;
+
+  // Look up for the transformation between target_frame and turtle2 frames
+  // and send velocity commands for turtle2 to reach target_frame
+  try {
+    t = tf_buffer_->lookupTransform(
+      toFrameRel, fromFrameRel,
+      tf2::TimePointZero);
+  } catch (const tf2::TransformException & ex) {
+    RCLCPP_INFO(
+      this->get_logger(), "Could not transform %s to %s: %s",
+      toFrameRel.c_str(), fromFrameRel.c_str(), ex.what());
+    return;
+  }
+  transform_matrix = tf2::transformToEigen(t);
+  Eigen::Vector3d world_pose = transform_matrix * camera_pose;
+
+  pose_from_camera_.setX(world_pose.x());
+  pose_from_camera_.setY(world_pose.y());
+  pose_from_camera_.setYaw(0);
+
+  RCLCPP_INFO(this->get_logger(), "camera pose: %f, %f", pose_from_camera_.getX(), pose_from_camera_.getY());
 }
 
 void PoseEstimationNode::timerCallback()
