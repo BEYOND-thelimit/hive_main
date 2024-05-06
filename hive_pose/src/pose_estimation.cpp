@@ -1,5 +1,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include "tf2/exceptions.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
@@ -38,18 +39,18 @@ class PoseEstimationNode : public rclcpp::Node
   ~PoseEstimationNode();
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr ekf_odom_sub_;
-  // TODO: 다현이가 감싸주는 메세지 타입으로 교체. 현재 그냥 예시로 nav_msgs::msg::Odometry 사용
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr camera_odom_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr camera_odom_sub_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr final_pose_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   void ekfOdomCallback(const nav_msgs::msg::Odometry::SharedPtr ekf_msg);
-  // TODO: 다현이가 감싸주는 메세지 타입으로 교체. 현재 그냥 예시로 nav_msgs::msg::Odometry 사용
-  void cameraOdomCallback(const nav_msgs::msg::Odometry::SharedPtr camera_msg);
+  void cameraOdomCallback(const std_msgs::msg::Float64MultiArray::SharedPtr camera_msg);
   void timerCallback();
 
  private:
   /* data */
+  double yolo_confidence = 0.5;
+  int robot_number_;
   Pose pose_from_ekf_;
   Pose pose_from_camera_;
   Pose final_pose_;
@@ -61,12 +62,16 @@ class PoseEstimationNode : public rclcpp::Node
 
 PoseEstimationNode::PoseEstimationNode(/* args */) : Node("final_pose_estimation_node")
 {
+  this->declare_parameter<std::int8_t>("robot_num", 1);
+  robot_number_ = this->get_parameter("robot_num").as_int();
+  std::string ekf_topic_name = "robot" + std::to_string(robot_number_) + "/ekf_odom";
+  std::string pose_topic_name = "robot" + std::to_string(robot_number_) + "/final_pose";
+
   ekf_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "robot1/ekf_odom", 10, std::bind(&PoseEstimationNode::ekfOdomCallback, this, std::placeholders::_1));
-  // TODO: 다현이가 감싸주는 메세지 타입으로 교체. 현재 그냥 예시로 nav_msgs::msg::Odometry 사용
-  camera_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "robot1/camera_odom", 10, std::bind(&PoseEstimationNode::cameraOdomCallback, this, std::placeholders::_1));
-  final_pose_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("robot1/final_pose", 10);
+      ekf_topic_name, 10, std::bind(&PoseEstimationNode::ekfOdomCallback, this, std::placeholders::_1));
+  camera_odom_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+      "detection_info", 10, std::bind(&PoseEstimationNode::cameraOdomCallback, this, std::placeholders::_1));
+  final_pose_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(pose_topic_name, 10);
   timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&PoseEstimationNode::timerCallback, this));
     // Declare and acquire `target_frame` parameter
     target_frame_ = this->declare_parameter<std::string>("target_frame", "camera1_link");
@@ -88,7 +93,7 @@ void PoseEstimationNode::ekfOdomCallback(const nav_msgs::msg::Odometry::SharedPt
   pose_from_ekf_.setYaw(ekf_msg->pose.pose.orientation.z);
 }
 
-void PoseEstimationNode::cameraOdomCallback(const nav_msgs::msg::Odometry::SharedPtr camera_msg)
+void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArray::SharedPtr camera_msg)
 {
   // Transform world -> camera1_link
   std::string fromFrameRel = target_frame_.c_str();
@@ -98,10 +103,13 @@ void PoseEstimationNode::cameraOdomCallback(const nav_msgs::msg::Odometry::Share
   Eigen::Isometry3d transform_matrix;
 
   Eigen::Vector3d camera_pose;
-  camera_pose.x() = camera_msg->pose.pose.position.x;
-  camera_pose.y() = camera_msg->pose.pose.position.y;
-  camera_pose.z() = camera_msg->pose.pose.position.z;
+  if (camera_msg->data[0] == robot_number_)
+  {
+    camera_pose.x() = camera_msg->data[1];
+    camera_pose.y() = camera_msg->data[2];
+    yolo_confidence = camera_msg->data[3]; // confidence
 
+  }
   // Look up for the transformation between target_frame and turtle2 frames
   // and send velocity commands for turtle2 to reach target_frame
   try {
@@ -127,7 +135,6 @@ void PoseEstimationNode::cameraOdomCallback(const nav_msgs::msg::Odometry::Share
 void PoseEstimationNode::timerCallback()
 {
   // linear interpolation
-  double yolo_confidence = 0.5;
   double alpha = yolo_confidence * 0.8;
 
   final_pose_.setX(alpha * pose_from_camera_.getX() + (1 - alpha) * pose_from_ekf_.getX());

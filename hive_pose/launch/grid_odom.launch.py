@@ -7,7 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     start_robot1_grid_odom_cmd = Node(
-        package='hive_main_pose',
+        package='hive_pose',
         executable='grid_map_odom_node',
         name='robot1_grid_map_odom_node',
         output='screen',
@@ -16,7 +16,7 @@ def generate_launch_description():
                     ]
     )
     start_robot2_grid_odom_cmd = Node(
-        package='hive_main_pose',
+        package='hive_pose',
         executable='grid_map_odom_node',
         name='robot2_grid_map_odom_node',
         output='screen',
@@ -29,7 +29,7 @@ def generate_launch_description():
         ]
     )
     start_robot3_grid_odom_cmd = Node(
-        package='hive_main_pose',
+        package='hive_pose',
         executable='grid_map_odom_node',
         name='robot3_grid_map_odom_node',
         output='screen',
