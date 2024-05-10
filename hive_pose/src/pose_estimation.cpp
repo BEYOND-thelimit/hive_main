@@ -58,6 +58,8 @@ class PoseEstimationNode : public rclcpp::Node
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::string target_frame_;
+  std::string frame_id_;
+  std::string child_frame_id_;
 };
 
 PoseEstimationNode::PoseEstimationNode(/* args */) : Node("final_pose_estimation_node")
@@ -66,15 +68,17 @@ PoseEstimationNode::PoseEstimationNode(/* args */) : Node("final_pose_estimation
   robot_number_ = this->get_parameter("robot_num").as_int();
   std::string ekf_topic_name = "robot" + std::to_string(robot_number_) + "/ekf_odom";
   std::string pose_topic_name = "robot" + std::to_string(robot_number_) + "/final_pose";
+  frame_id_ = "robot" + std::to_string(robot_number_) + "_odom";
+  child_frame_id_ = "robot" + std::to_string(robot_number_) + "_base_link";
 
   ekf_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       ekf_topic_name, 10, std::bind(&PoseEstimationNode::ekfOdomCallback, this, std::placeholders::_1));
   camera_odom_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-      "detection_info", 10, std::bind(&PoseEstimationNode::cameraOdomCallback, this, std::placeholders::_1));
+      "hive_yolo/detection_info", 10, std::bind(&PoseEstimationNode::cameraOdomCallback, this, std::placeholders::_1));
   final_pose_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(pose_topic_name, 10);
   timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&PoseEstimationNode::timerCallback, this));
     // Declare and acquire `target_frame` parameter
-    target_frame_ = this->declare_parameter<std::string>("target_frame", "camera1_link");
+    target_frame_ = this->declare_parameter<std::string>("target_frame", "camera_color_optical_frame");
 
     tf_buffer_ =
       std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -103,12 +107,12 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
   Eigen::Isometry3d transform_matrix;
 
   Eigen::Vector3d camera_pose;
-  if (camera_msg->data[0] == robot_number_)
+  if (int(camera_msg->data[0]) == robot_number_)
   {
     camera_pose.x() = camera_msg->data[1];
     camera_pose.y() = camera_msg->data[2];
     yolo_confidence = camera_msg->data[3]; // confidence
-
+    camera_pose.z() = 1;  // homogeneous coordinate
   }
   // Look up for the transformation between target_frame and turtle2 frames
   // and send velocity commands for turtle2 to reach target_frame
@@ -123,19 +127,23 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
     return;
   }
   transform_matrix = tf2::transformToEigen(t);
+  //std::cout << transform_matrix.matrix() << std::endl;
   Eigen::Vector3d world_pose = transform_matrix * camera_pose;
 
   pose_from_camera_.setX(world_pose.x());
   pose_from_camera_.setY(world_pose.y());
   pose_from_camera_.setYaw(0);
 
-  RCLCPP_INFO(this->get_logger(), "camera pose: %f, %f", pose_from_camera_.getX(), pose_from_camera_.getY());
+  //RCLCPP_INFO(this->get_logger(), "id: %f, camera pose: %f, %f", camera_msg->data[0], pose_from_camera_.getX(), pose_from_camera_.getY());
 }
 
 void PoseEstimationNode::timerCallback()
 {
   // linear interpolation
-  double alpha = yolo_confidence * 0.8;
+  double alpha = yolo_confidence * 1.0;
+  alpha = alpha > 1.0 ? 1.0 : alpha;
+
+  alpha = 1.0; // check only camera
 
   final_pose_.setX(alpha * pose_from_camera_.getX() + (1 - alpha) * pose_from_ekf_.getX());
   final_pose_.setY(alpha * pose_from_camera_.getY() + (1 - alpha) * pose_from_ekf_.getY());
@@ -144,8 +152,8 @@ void PoseEstimationNode::timerCallback()
   // final pose publish
   nav_msgs::msg::Odometry odom_msg;
   odom_msg.header.stamp = this->now();
-  odom_msg.header.frame_id = "robot1_odom";
-  odom_msg.child_frame_id = "robot1_base_link";
+  odom_msg.header.frame_id = frame_id_;
+  odom_msg.child_frame_id = child_frame_id_;
   odom_msg.pose.pose.position.x = final_pose_.getX();
   odom_msg.pose.pose.position.y = final_pose_.getY();
   odom_msg.pose.pose.position.z = 0;
