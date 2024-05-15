@@ -106,13 +106,14 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
   geometry_msgs::msg::TransformStamped t;
   Eigen::Isometry3d transform_matrix;
 
-  Eigen::Vector3d camera_pose;
+  Eigen::Vector4d camera_pose;
   if (int(camera_msg->data[0]) == robot_number_)
   {
     camera_pose.x() = camera_msg->data[1];
     camera_pose.y() = camera_msg->data[2];
     yolo_confidence = camera_msg->data[3]; // confidence
-    camera_pose.z() = 1;  // homogeneous coordinate
+    camera_pose.z() = 1;
+    camera_pose.w() = 1;  // homogeneous coordinate
   }
   // Look up for the transformation between target_frame and turtle2 frames
   // and send velocity commands for turtle2 to reach target_frame
@@ -120,21 +121,21 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
     t = tf_buffer_->lookupTransform(
       toFrameRel, fromFrameRel,
       tf2::TimePointZero);
+    RCLCPP_INFO(this->get_logger(), "Success Transform");
   } catch (const tf2::TransformException & ex) {
     RCLCPP_INFO(
       this->get_logger(), "Could not transform %s to %s: %s",
       toFrameRel.c_str(), fromFrameRel.c_str(), ex.what());
     return;
   }
-  transform_matrix = tf2::transformToEigen(t);
-  //std::cout << transform_matrix.matrix() << std::endl;
-  Eigen::Vector3d world_pose = transform_matrix * camera_pose;
+  transform_matrix = tf2::transformToEigen(t);  // 4x4 matrix
+  Eigen::Vector4d world_pose = transform_matrix * camera_pose;
 
   pose_from_camera_.setX(world_pose.x());
   pose_from_camera_.setY(world_pose.y());
   pose_from_camera_.setYaw(0);
 
-  //RCLCPP_INFO(this->get_logger(), "id: %f, camera pose: %f, %f", camera_msg->data[0], pose_from_camera_.getX(), pose_from_camera_.getY());
+  //RCLCPP_INFO(this->get_logger(), "id: %d, camera pose: %f, %f", detect_robot_number_, pose_from_camera_.getX(), pose_from_camera_.getY());
 }
 
 void PoseEstimationNode::timerCallback()
