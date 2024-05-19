@@ -22,14 +22,16 @@ GridOdom::GridOdom(/* args */) : Node("grid_odom_node")
   grid_odom_pub_ = this->create_publisher<std_msgs::msg::Int16MultiArray>("robot1/grid_odom", 10);
 }
 
-GridOdom::~GridOdom()
+GridOdom::~GridOdom() 
 {
 }
 
 void GridOdom::finalPoseCallback(const nav_msgs::msg::Odometry::SharedPtr final_pose_msg)
 {
-  double scaling_width = 0.0074;     // Real: 1px = 0.0074m
-  double scaling_height = 0.0058;    // Real: 1px = 0.0058m
+  int camera_width = 640;
+  int camera_height = 480;
+  double scaling_width = 0.00440625;     // Real: 1px = 0.0074m
+  double scaling_height = 0.004520833;    // Real: 1px = 0.0058m
 
   double world_coords_x;
   double world_coords_y;
@@ -39,30 +41,33 @@ void GridOdom::finalPoseCallback(const nav_msgs::msg::Odometry::SharedPtr final_
   double x_scaled = world_coords_x / scaling_width;
   double y_scaled = world_coords_y / scaling_height;
 
-  int grid_x;
-  int grid_y;
+  int w_grid_x;
+  int w_grid_y;
 
   if (x_scaled - (int)x_scaled >= 0.5)
   {
-    grid_x = (int)x_scaled + 1;
+    w_grid_x = (int)x_scaled + 1;
   }
   else
   {
-    grid_x = (int)x_scaled;
+    w_grid_x = (int)x_scaled;
   }
 
   if (y_scaled - (int)y_scaled >= 0.5)
   {
-    grid_y = (int)y_scaled + 1;
+    w_grid_y = (int)y_scaled + 1;
   }
   else
   {
-    grid_y = (int)y_scaled;
+    w_grid_y = (int)y_scaled;
   }
 
+  int final_grid_x = -w_grid_y;
+  int final_grid_y = camera_height - w_grid_x;
+
   std_msgs::msg::Int16MultiArray grid_odom;
-  grid_odom.data.push_back(grid_x);
-  grid_odom.data.push_back(grid_y);
+  grid_odom.data.push_back(final_grid_x);
+  grid_odom.data.push_back(final_grid_y);
 
   grid_odom_pub_->publish(grid_odom);
 }
