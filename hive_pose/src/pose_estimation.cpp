@@ -141,10 +141,8 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
 void PoseEstimationNode::timerCallback()
 {
   // linear interpolation
-  double alpha = yolo_confidence * 1.0;
+  double alpha = yolo_confidence * 0.5;  // weight
   alpha = alpha > 1.0 ? 1.0 : alpha;
-
-  alpha = 1.0; // check only camera
 
   final_pose_.setX(alpha * pose_from_camera_.getX() + (1 - alpha) * pose_from_ekf_.getX());
   final_pose_.setY(alpha * pose_from_camera_.getY() + (1 - alpha) * pose_from_ekf_.getY());
