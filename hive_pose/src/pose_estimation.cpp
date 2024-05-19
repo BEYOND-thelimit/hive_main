@@ -144,6 +144,8 @@ void PoseEstimationNode::timerCallback()
   double alpha = yolo_confidence * 0.5;  // weight
   alpha = alpha > 1.0 ? 1.0 : alpha;
 
+  alpha = 1.0;
+
   final_pose_.setX(alpha * pose_from_camera_.getY() + (1 - alpha) * pose_from_ekf_.getY());
   final_pose_.setY(alpha * pose_from_camera_.getX() + (1 - alpha) * pose_from_ekf_.getX());
   final_pose_.setYaw(pose_from_ekf_.getYaw());
