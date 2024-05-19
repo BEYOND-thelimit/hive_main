@@ -62,8 +62,9 @@ void GridOdom::finalPoseCallback(const nav_msgs::msg::Odometry::SharedPtr final_
     w_grid_y = (int)y_scaled;
   }
 
-  int final_grid_x = -w_grid_y;
-  int final_grid_y = camera_height - w_grid_x;
+  // 축 변화가 있을 수도 있으니까 변수 따로 받음.
+  int final_grid_x = w_grid_x;
+  int final_grid_y = w_grid_y;
 
   std_msgs::msg::Int16MultiArray grid_odom;
   grid_odom.data.push_back(final_grid_x);
