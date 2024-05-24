@@ -57,7 +57,8 @@ class PoseEstimationNode : public rclcpp::Node
 
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-  std::string target_frame_;
+  std::string camera_frame_;
+  std::string odom_frame_;
   std::string frame_id_;
   std::string child_frame_id_;
 };
@@ -77,13 +78,14 @@ PoseEstimationNode::PoseEstimationNode(/* args */) : Node("final_pose_estimation
       "hive_yolo/detection_info", 10, std::bind(&PoseEstimationNode::cameraOdomCallback, this, std::placeholders::_1));
   final_pose_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(pose_topic_name, 10);
   timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&PoseEstimationNode::timerCallback, this));
-    // Declare and acquire `target_frame` parameter
-    target_frame_ = this->declare_parameter<std::string>("target_frame", "camera_color_optical_frame");
+  // Declare and acquire `target_frame` parameter
+  camera_frame_ = this->declare_parameter<std::string>("camera_frame", "camera_color_optical_frame");
+  odom_frame_ = this->declare_parameter<std::string>("odom_frame", frame_id_);
 
-    tf_buffer_ =
-      std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listener_ =
-      std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+  tf_buffer_ =
+    std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ =
+    std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 PoseEstimationNode::~PoseEstimationNode()
@@ -92,15 +94,41 @@ PoseEstimationNode::~PoseEstimationNode()
 
 void PoseEstimationNode::ekfOdomCallback(const nav_msgs::msg::Odometry::SharedPtr ekf_msg)
 {
-  pose_from_ekf_.setX(ekf_msg->pose.pose.position.x);
-  pose_from_ekf_.setY(ekf_msg->pose.pose.position.y);
+  Eigen::Vector4d odom_pose;
+  odom_pose.x() = ekf_msg->pose.pose.position.x;
+  odom_pose.y() = ekf_msg->pose.pose.position.y;
+  odom_pose.z() = 1;
+  odom_pose.w() = 1;  // homogeneous coordinate
+
+  std::string fromFrameRel = odom_frame_.c_str();
+  std::string toFrameRel = "world";
+
+  geometry_msgs::msg::TransformStamped t;
+  Eigen::Isometry3d transform_matrix;
+
+  try {
+    t = tf_buffer_->lookupTransform(
+      toFrameRel, fromFrameRel,
+      tf2::TimePointZero);
+    RCLCPP_INFO(this->get_logger(), "Success Transform");
+  } catch (const tf2::TransformException & ex) {
+    RCLCPP_INFO(
+      this->get_logger(), "Could not transform %s to %s: %s",
+      toFrameRel.c_str(), fromFrameRel.c_str(), ex.what());
+    return;
+  }
+  transform_matrix = tf2::transformToEigen(t);  // 4x4 matrix
+  Eigen::Vector4d world_pose = transform_matrix * odom_pose;
+
+  pose_from_ekf_.setX(world_pose.x());
+  pose_from_ekf_.setY(world_pose.y());
   pose_from_ekf_.setYaw(ekf_msg->pose.pose.orientation.z);
 }
 
 void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArray::SharedPtr camera_msg)
 {
   // Transform world -> camera1_link
-  std::string fromFrameRel = target_frame_.c_str();
+  std::string fromFrameRel = camera_frame_.c_str();
   std::string toFrameRel = "world";
 
   geometry_msgs::msg::TransformStamped t;
@@ -115,8 +143,7 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
     camera_pose.z() = 1;
     camera_pose.w() = 1;  // homogeneous coordinate
   }
-  // Look up for the transformation between target_frame and turtle2 frames
-  // and send velocity commands for turtle2 to reach target_frame
+
   try {
     t = tf_buffer_->lookupTransform(
       toFrameRel, fromFrameRel,
