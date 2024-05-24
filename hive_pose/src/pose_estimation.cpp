@@ -8,11 +8,20 @@
 #include "tf2_eigen/tf2_eigen.hpp"
 #include "eigen3/Eigen/Dense"
 
-auto createQuaternionMsgFromYaw(double yaw)
+auto create_quaternion_msg_from_yaw(double yaw)
 {
   tf2::Quaternion q;
   q.setRPY(0, 0, yaw);
   return tf2::toMsg(q);
+}
+
+auto quaternion_to_yaw(geometry_msgs::msg::Quaternion q)
+{
+  tf2::Quaternion tf2_q;
+  tf2::fromMsg(q, tf2_q);
+  double roll, pitch, yaw;
+  tf2::Matrix3x3(tf2_q).getRPY(roll, pitch, yaw);
+  return yaw;
 }
 
 struct Pose
@@ -110,15 +119,18 @@ void PoseEstimationNode::ekfOdomCallback(const nav_msgs::msg::Odometry::SharedPt
     t = tf_buffer_->lookupTransform(
       toFrameRel, fromFrameRel,
       tf2::TimePointZero);
-    RCLCPP_INFO(this->get_logger(), "Success Transform");
   } catch (const tf2::TransformException & ex) {
     RCLCPP_INFO(
-      this->get_logger(), "Could not transform %s to %s: %s",
+      this->get_logger(), "Could not Odom-World transform %s to %s: %s",
       toFrameRel.c_str(), fromFrameRel.c_str(), ex.what());
     return;
   }
   transform_matrix = tf2::transformToEigen(t);  // 4x4 matrix
   Eigen::Vector4d world_pose = transform_matrix * odom_pose;
+
+  double yaw = quaternion_to_yaw(ekf_msg->pose.pose.orientation);
+
+  RCLCPP_INFO(this->get_logger(), "yaw: %f", yaw);
 
   pose_from_ekf_.setX(world_pose.x());
   pose_from_ekf_.setY(world_pose.y());
@@ -148,10 +160,9 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
     t = tf_buffer_->lookupTransform(
       toFrameRel, fromFrameRel,
       tf2::TimePointZero);
-    RCLCPP_INFO(this->get_logger(), "Success Transform");
   } catch (const tf2::TransformException & ex) {
     RCLCPP_INFO(
-      this->get_logger(), "Could not transform %s to %s: %s",
+      this->get_logger(), "Could not Camera-World transform %s to %s: %s",
       toFrameRel.c_str(), fromFrameRel.c_str(), ex.what());
     return;
   }
@@ -160,9 +171,7 @@ void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArr
 
   pose_from_camera_.setX(world_pose.x());
   pose_from_camera_.setY(world_pose.y());
-  pose_from_camera_.setYaw(0);
-
-  //RCLCPP_INFO(this->get_logger(), "id: %d, camera pose: %f, %f", detect_robot_number_, pose_from_camera_.getX(), pose_from_camera_.getY());
+  pose_from_camera_.setYaw(0);  // If you can get yaw value from camera, change 0 to yaw.
 }
 
 void PoseEstimationNode::timerCallback()
@@ -178,12 +187,12 @@ void PoseEstimationNode::timerCallback()
   // final pose publish
   nav_msgs::msg::Odometry odom_msg;
   odom_msg.header.stamp = this->now();
-  odom_msg.header.frame_id = 'world';
+  odom_msg.header.frame_id = "world";
   odom_msg.child_frame_id = child_frame_id_;
   odom_msg.pose.pose.position.x = final_pose_.getX();
   odom_msg.pose.pose.position.y = final_pose_.getY();
   odom_msg.pose.pose.position.z = 0;
-  odom_msg.pose.pose.orientation = createQuaternionMsgFromYaw(final_pose_.getYaw());
+  odom_msg.pose.pose.orientation = create_quaternion_msg_from_yaw(final_pose_.getYaw());
   final_pose_pub_->publish(odom_msg);
 }
 
