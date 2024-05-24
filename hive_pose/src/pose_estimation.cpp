@@ -180,7 +180,7 @@ void PoseEstimationNode::timerCallback()
   // final pose publish
   nav_msgs::msg::Odometry odom_msg;
   odom_msg.header.stamp = this->now();
-  odom_msg.header.frame_id = frame_id_;
+  odom_msg.header.frame_id = 'world';
   odom_msg.child_frame_id = child_frame_id_;
   odom_msg.pose.pose.position.x = final_pose_.getX();
   odom_msg.pose.pose.position.y = final_pose_.getY();
