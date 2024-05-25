@@ -13,6 +13,7 @@ def generate_launch_description():
         output='screen',
         parameters=[
                     {'use_sim_time': True},
+                    {'robot_num': 1}
                     ]
     )
     start_robot2_grid_odom_cmd = Node(
@@ -22,11 +23,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
                     {'use_sim_time': True},
-                    ],
-        remappings=[
-            ('/robot1/final_pose', '/robot2/final_pose'),
-            ('/robot1/grid_odom', '/robot2/grid_odom'),
-        ]
+                    {'robot_num': 2}
+                    ]
     )
     start_robot3_grid_odom_cmd = Node(
         package='hive_pose',
@@ -35,11 +33,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
                     {'use_sim_time': True},
-                    ],
-        remappings=[
-            ('/robot1/final_pose', '/robot3/final_pose'),
-            ('/robot1/grid_odom', '/robot3/grid_odom'),
-        ]
+                    {'robot_num': 3}
+                    ]
     )
 
     return LaunchDescription([
