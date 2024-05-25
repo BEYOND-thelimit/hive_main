@@ -134,7 +134,7 @@ void PoseEstimationNode::ekfOdomCallback(const nav_msgs::msg::Odometry::SharedPt
 
   pose_from_ekf_.setX(world_pose.x());
   pose_from_ekf_.setY(world_pose.y());
-  pose_from_ekf_.setYaw(ekf_msg->pose.pose.orientation.z);
+  pose_from_ekf_.setYaw(yaw);
 }
 
 void PoseEstimationNode::cameraOdomCallback(const std_msgs::msg::Float64MultiArray::SharedPtr camera_msg)
