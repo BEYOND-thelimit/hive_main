@@ -28,10 +28,8 @@ GridOdom::~GridOdom()
 
 void GridOdom::finalPoseCallback(const nav_msgs::msg::Odometry::SharedPtr final_pose_msg)
 {
-  int camera_width = 640;
-  int camera_height = 480;
-  double scaling_width = 0.00440625;     // Real: 1px = 0.0074m
-  double scaling_height = 0.004520833;    // Real: 1px = 0.0058m
+  double scaling_width = 0.00440625;     // m/px width
+  double scaling_height = 0.004520833;    // m/px height
 
   double world_coords_x;
   double world_coords_y;
