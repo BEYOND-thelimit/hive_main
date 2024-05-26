@@ -13,13 +13,18 @@ class GridOdom : public rclcpp::Node
 
  private:
   /* data */
+  int robot_number_;
 };
 
 GridOdom::GridOdom(/* args */) : Node("grid_odom_node")
 {
+  this->declare_parameter<std::int8_t>("robot_num", 1);
+  robot_number_ = this->get_parameter("robot_num").as_int();
+  std::string pose_topic_name = "robot" + std::to_string(robot_number_) + "/final_pose";
+  std::string grid_topic_name = "robot" + std::to_string(robot_number_) + "/grid_odom";
   final_pose_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "robot1/final_pose", 10, std::bind(&GridOdom::finalPoseCallback, this, std::placeholders::_1));
-  grid_odom_pub_ = this->create_publisher<std_msgs::msg::Int16MultiArray>("robot1/grid_odom", 10);
+      pose_topic_name, 10, std::bind(&GridOdom::finalPoseCallback, this, std::placeholders::_1));
+  grid_odom_pub_ = this->create_publisher<std_msgs::msg::Int16MultiArray>(grid_topic_name, 10);
 }
 
 GridOdom::~GridOdom() 
