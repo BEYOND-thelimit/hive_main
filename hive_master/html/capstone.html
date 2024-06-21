@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<script type="text/javascript" src="roslib.js"></script>
+<title>Custom Webpage</title>
+<script>
+    var ros = new ROSLIB.Ros({
+      url : 'ws://localhost:9090'
+    });
+    
+    ros.on('connection', function() {
+    console.log('Connected to rosbridge server.');
+  });
+  
+  ros.on('error', function(error) {
+    console.log('Error connecting to rosbridge server: ', error);
+  });
+  
+  var receivedAnswer;
+  var goalFromWeb = new ROSLIB.Topic({
+    ros : ros,
+    name : '/goalFromWeb',
+    messageType : 'std_msgs/Int16MultiArray'
+  
+  });
+  
+  
+  var goalData  = new ROSLIB.Message({
+    // data: [currentCount, goal_x, goal_y, goal_yaw]
+    data: [2 ,300, 380, 2]
+
+  });
+  
+ 
+  </script>
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: white;
+        width: 1920px;
+        height: 1080px;
+    }
+    .touch-screen {
+        position: absolute;
+        left: 400px;
+        top: 250px;
+        width: 640px;
+        height: 480px;
+        background-color: #858484; /* 회색 배경, 터치 스크린을 나타내기 위함 */
+    }
+    .red-dot {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: red;
+        border-radius: 50%;
+    }
+    .text-box1, .text-box2 {
+        position: absolute;
+        width: 150px;
+        height: 60px;
+        background-color: #fff; /* 흰색 배경 */
+        border: 1px solid #000; /* 검은색 테두리 */
+        text-align: center; /* 텍스트 가운데 정렬 */
+        line-height: 60px; /* 높이에 맞춰 텍스트를 가운데에 위치시킴 */
+        font-size: 24px; /* 텍스트 크기 */
+        font-weight: bold; /* 텍스트 굵게 */
+    }
+    .text-box1 {
+        left: 1350px;
+        top: 250px;
+    }
+    .text-box2 {
+        left: 1505px;
+        top: 250px;
+    }
+    .btn_up, .btn_down {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background-color: #ddd; /* 회색 배경 */
+        border: none;
+        cursor: pointer; /* 커서 포인터로 변경 */
+        font-size: 24px; /* 버튼 텍스트 크기 */
+        font-weight: bold; /* 텍스트 굵게 */
+    }
+    .btn_up {
+        left: 1700px;
+        top: 230px;
+    }
+    .btn_down {
+        left: 1700px;
+        top: 290px;
+    }
+    .blue-square1, .blue-square2 {
+        position: absolute;
+        background-color: blue; /* 파란색 배경 */
+    }
+    .blue-square1 {
+        left: 1360px;
+        top: 450px;
+        width: 165px;
+        height: 60px;
+    }
+    .blue-square2 {
+        left: 1615px;
+        top: 400px;
+        width: 60px;
+        height: 165px;
+    }
+    .radio-button {
+        top: 600px;
+        position: absolute;
+        cursor: pointer;
+    }
+    .radio-button.radio_1 {
+        left: 1435px;
+    }
+    .radio-button.radio_2 {
+        left: 1635px;
+    }
+    .btn_done {
+        position: absolute;
+        width: 271px;
+        height: 106px;
+        top: 700px;
+        left: 1420px;
+        background-color: rgb(255, 255, 255); /* 임시 색상 */
+        border: none;
+        cursor: pointer;
+        font-size: 24px; /* 버튼 텍스트 크기 */
+        font-weight: bold; /* 텍스트 굵게 */
+    }
+</style>
+</head>
+<body>
+    <div class="touch-screen" id="touchScreen"></div>
+    <div class="text-box1">인원 수</div>
+    <div class="text-box2" id="counter">0</div>
+    <div class="blue-square1"></div>
+    <div class="blue-square2"></div>
+    <input type="radio" class="radio-button radio_1" name="option" onclick="setYAW(1)">
+    <input type="radio" class="radio-button radio_2" name="option" onclick="setYAW(2)">
+    <button id="btnup" class="btn_up" onclick="increaseCount()">+</button>
+    <button id="btndown" class="btn_down" onclick="decreaseCount()">-</button>
+    <button id="btndone" class="btn_done">위치 지정</button>
+
+    <script>
+        var currentCount = 0; // 카운터의 초기값 설정
+        var goal_x = 0, goal_y = 0, goal_yaw = 0; // 초기 좌표 및 YAW 값 설정
+
+        // 카운트 증가 함수
+        function increaseCount() {
+            currentCount += 1;
+            document.getElementById('counter').innerText = currentCount;
+        }
+
+        // 카운트 감소 함수
+        function decreaseCount() {
+            if (currentCount > 0) {
+                currentCount -= 1;
+                document.getElementById('counter').innerText = currentCount;
+            }
+        }
+        
+        
+        // YAW 값 설정 함수
+        function setYAW(value) {
+            goal_yaw = value;
+            console.log("YAW 값이 " + goal_yaw + "(으)로 설정되었습니다."); // 개발자 도구 콘솔에서 확인 가능
+        }
+        document.querySelector('.touch-screen').addEventListener('click', function(event) {
+            var touchScreenRect = this.getBoundingClientRect();
+            goal_x = Math.round(event.clientX - touchScreenRect.left); // 정수로 변환
+            goal_y = Math.round(touchScreenRect.bottom - event.clientY); // 정수로 변환
+            
+            console.log("터치 좌표: (" + goal_x + ", " + goal_y + ")");
+
+            // 기존 빨간 점 제거
+            var existingRedDot = document.querySelector('.red-dot');
+            if (existingRedDot) {
+                existingRedDot.remove();
+            }
+
+            // 빨간색 점 생성 및 위치 지정
+            var redDot = document.createElement('div');
+            redDot.classList.add('red-dot');
+            redDot.style.left = (goal_x - 5) + 'px'; // 점의 중심을 맞추기 위해 5px을 뺌
+            redDot.style.top = (480 - goal_y - 5) + 'px'; // 점의 중심을 맞추기 위해 5px을 뺌
+            document.getElementById('touchScreen').appendChild(redDot);
+        });
+        
+        document.getElementById('btndone').addEventListener('click', function() {
+            if(currentCount > 0 && goal_x !== 0 && goal_y !== 0 && goal_yaw !== 0) {
+                goalData = [];
+                goalData = [2 ,300, 380, 2];
+                var goalData  = new ROSLIB.Message({
+                    data: [2 ,300, 380, 2]
+                });
+                
+                console.log('goalData:', goalData);
+                goalFromWeb.publish(goalData);
+                currentCount = 0;
+                goal_x = 0;
+                goal_y = 0; 
+                goal_yaw = 0;
+                document.getElementById('counter').innerText = currentCount;
+                console.log('afterpub:', goalData);
+
+                // 라디오 버튼 초기화
+                var radioButtons = document.querySelectorAll('.radio-button');
+                radioButtons.forEach(function(radio) {
+                    radio.checked = false;
+                });
+
+                // 터치 스크린 초기화
+                var touchScreen = document.getElementById('touchScreen');
+                var existingRedDot = document.querySelector('.red-dot');
+                if (existingRedDot) {
+                    existingRedDot.remove();
+                }
+
+                // 버튼 비활성화 및 5초 타이머 시작
+                var btnDone = document.getElementById('btndone');
+                btnDone.disabled = true;
+
+                var countdown = 5;
+                var interval = setInterval(function() {
+                    if (countdown > 0) {
+                        btnDone.innerText = countdown + " 초";
+                        countdown--;
+                    } else {
+                        clearInterval(interval);
+                        btnDone.disabled = false;
+                        btnDone.innerText = "위치 지정";
+                    }
+                }, 1000);
+
+            } else {
+                console.log('모든 필수 값이 설정되지 않았습니다.');
+            }
+        });
+    </script>
+</body>
+</html>
