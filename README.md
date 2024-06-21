@@ -1,1 +1,2 @@
 # hive_table
+"."
