@@ -1,2 +1,2 @@
-# hive_table
+# hive_main
 "."
