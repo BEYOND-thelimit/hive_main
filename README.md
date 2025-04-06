@@ -12,6 +12,6 @@
 - **Use of this software or its ideas for commercial purposes is not allowed.**
 
 For commercial licensing inquiries, please contact:
-**[taehun-ryu@gmail.com]**
+**[xogns2079@gmail.com]**
 
 ---
